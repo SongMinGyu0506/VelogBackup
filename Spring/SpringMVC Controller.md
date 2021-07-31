@@ -80,46 +80,84 @@ public class SampleDTO {
 		log.info(""+dto);
 		return "ex01";	
 	}
+```
+* 해당 파라미터로 들어가있는 SampleDTO는 <code>@Data</code> 어노테이션이 들어가있어서 Getter/Setter가 자동으로 설정되어있다.  
+Get 방식으로 작동하므로 URL 뒤에 ?name=OOO&age=1234 이런 방식으로 입력하면 자동으로 Setter가 작동되어 처리된다.
+  
+```java
 	@GetMapping("/ex02")
 	public String ex02(@RequestParam("name") String name, @RequestParam("age") int age) {
 		log.info("name: "+name);
 		log.info("age: "+age);
 		return "ex02";
 	}
+```
+* 파라미터를 클래스가 아닌 기본 자료형을 이용하는 방법또한 있다.
+* @RequestParam() 어노테이션을 이용하여 사용
+```java
 	@GetMapping("/ex02List")
 	public String ex02List(@RequestParam("ids")ArrayList<String> ids) {
 		log.info("ids :" + ids);
 		return "ex02List";
 	}
+```
+```java
 	@GetMapping("/ex02Array")
 	public String ex02Array(@RequestParam("ids") String[] ids) {
 		log.info("array ids: " + Arrays.toString(ids));
 		return "ex02Array";
 	}
-	
+```
+* 리스트와 배열을 이용한 방법
+* /sample/ex02(Array & List)?ids=111&ids=222 이런 방식으로 사용
+```java
 	@GetMapping("/ex02Bean")
 	public String ex02Bean(SampleDTOList list) {
 		log.info("list dtos: " + list);
 		return "ex02Bean";
 	}
+```
+* 객체리스트 이용
+
+#### @InitBinder
+특정 입력 받은 문자열을 자바에서 사용하는 특정 데이터 타입으로 변환하는 작업
+```java
+package org.zerock.domain;
+
+import java.util.Date;
+
+import lombok.Data;
+
+@Data
+public class TodoDTO {
+	private String title;
+	private Date dueDate;
+}
+```
+```java
+    @InitBinder
+	public void initBinder(WebDataBinder binder) {
+		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+		binder.registerCustomEditor(java.util.Date.class, new CustomDateEditor(dateFormat, false));
+	}
+```
+```java
 	@GetMapping("/ex03")
 	public String ex03(TodoDTO todo) {
 		log.info("todo: "+ todo);
 		return "ex03";
 	}
+```
+dueDate=yyyy-mm-dd 방식으로 입력 받는다면 java.util.Date 형식에 맞춰서 저장된다.
+
+#### Model 데이터 전달자
+컨트롤러에서 값을 입력 받았으면, 입력 받은 값을 출력하는 방법 또한 있다.  
+Spring에서는 기본적으로 Beans의 규칙에 맞는 객체들은 별다른 처리 없이 출력할 수 있도록 되어있다. 하지만 기본 자료형의 경우는 선언하더라도 기본적으로 전달이 되지 않는다. 이때 @ModelAttribute 어노테이션을 이용하여 전달할 수 있다.
+```java
 	@GetMapping("/ex04")
 	public String ex04(SampleDTO dto, @ModelAttribute("page") int page) {
 		log.info("dto: "+dto);
 		log.info("page: "+page);
-		return "/sample/ex04";
-	}
-	
-	@GetMapping("/ex06")
-	public @ResponseBody SampleDTO ex06() {
-		log.info("/ex06................");
-		SampleDTO dto = new SampleDTO();
-		dto.setAge(10);
-		dto.setName("홍길동");
-		return dto;
+		return "/sample/ex04"; //views/sample/ex04.jsp
 	}
 ```
