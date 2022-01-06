@@ -246,3 +246,13 @@ User.update({
     },
 });
 ```
+
+### DELETE
+```javascript
+User.destory({
+    where: {id:2},
+});
+```
+---
+## 관계 쿼리
+include 속성을 사용하여 외래키로 연결되어있는 테이블의 데이터까지 반환한다.
