@@ -256,3 +256,21 @@ User.destory({
 ---
 ## 관계 쿼리
 include 속성을 사용하여 외래키로 연결되어있는 테이블의 데이터까지 반환한다.
+```javascript
+const user = await User.findOne({
+    include: [{
+        model:Comment,
+    }]
+});
+console.log(user.Comments);
+
+//같은 방법
+const user = await User.findOne({});
+const comments = await user.getComments();
+console.log(comments);
+
+/*
+    관계가 설정되어있다면, getComments, setComments, addComment, addComments, removeComments 메서드를 지원한다.
+    include 내에도 where나 attribute를 지원한다.
+*/
+```
