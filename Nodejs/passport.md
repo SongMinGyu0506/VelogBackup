@@ -106,7 +106,7 @@ module.exports = () => {
 5. 라우터에서 req.user 객체 사용 가능
 
 # Local 로그인 구현
-__예제__ 로그인 여부 판단 미들웨어
+## __예제__ 로그인 여부 판단 미들웨어
 ```javascript
 //routes/middlewares.js
 
@@ -129,3 +129,75 @@ exports.isNotLoggedIn = (req,res,next) => {
     }
 } 
 ```
+라우팅 렌더링 전, 해당 메서드를 사용하면 로그인이 필요하거나 필요하지 않은 라우팅으로 대체가능
+
+## 관련 라우터 예제 (join,login,logout)
+```javascript
+...
+//회원가입 라우팅
+router.post('/join',isNotLoggedIn, async (req,res,next)=>{
+    const {email,nick,password} = req.body; // 프론트의 form 데이터
+    try {
+        const exUser = await User.findOne({where:{email}}); //email로 유저데이터 서치
+        
+        //이미 존재하는 이메일의 경우,
+        if(exUser) {
+            return res.redirect('/join?error=exist');
+        }
+
+        //비밀번호 해싱처리 bcrypt.hash(password,hasingLength)
+        const hash = await bcrypt.hash(password,12);
+
+        //db 등록
+        await User.create({
+            email,
+            nick,
+            password:hash,
+        });
+        return res.redirect('/');
+
+        //error 처리
+    } catch (error) {
+        console.error(error);
+        return next(error)
+    }
+});
+
+//로그인 시도 라우팅
+router.post('/login',isNotLoggedIn, (req,res,next)=>{
+    //passport.authenticate('local') 일 경우, 로컬 전략 실행 해당 메서드로 전략 성공 및 실패 여부 판정
+    passport.authenticate('local',(authError,user,info)=> {
+
+        //첫번째 파라미터가 존재한다면 해당 전략은 실패
+        if (authError) {
+            console.error(authError);
+            return next(authError);
+        }
+
+        //user 데이터가 없어도 실패, 전략에서 지정한 info.message 출력
+        if (!user) {
+            return res.redirect(`/?loginError=${info.message}`);
+        }
+
+        //전략 성공시 req에 login과 logout 메서드를 추가함
+        //req.login은 passport.serializeUser를 호출
+        return req.login(user,(loginError)=> {
+            if(loginError) {
+                console.error(loginError);
+                return next(loginError);
+            }
+            return res.redirect('/');
+        });
+    })(req,res,next);
+});
+
+//로그아웃 메서드
+router.get('/logout',isLoggedIn,(req,res)=>{
+    req.logout();
+    req.session.destroy();
+    res.redirect('/');
+});
+
+module.exports = router;
+```
+## 로컬 전략 모듈
