@@ -105,6 +105,7 @@ module.exports = () => {
 4. 조회된 사용자 정보를 req.user에 저장
 5. 라우터에서 req.user 객체 사용 가능
 
+
 # Local 로그인 구현
 ## __예제__ 로그인 여부 판단 미들웨어
 ```javascript
@@ -201,3 +202,97 @@ router.get('/logout',isLoggedIn,(req,res)=>{
 module.exports = router;
 ```
 ## 로컬 전략 모듈
+```javascript
+//passport/localStrategy.js
+const passport = require('passport');
+const LocalStrategy = require('passport-local');
+const bcrypt = require('bcrypt');
+
+const User = require('../models/user');
+
+module.exports = () => {
+    //usernameFiield와 passwordField는 req.body의 form name
+    passport.use(new LocalStrategy({
+        usernameField: 'email',
+        passwordField:'password',
+        //아래 콜백함수부터 전략 처리
+    }, async (email,password,done)=>{
+        try {
+            const exUser = await User.findOne({where:{email}}); //DB에서 해당 유저의 계정으로 유저 데이터 추출
+            // 존재하는 계정이라면
+            if (exUser) {
+                const result = await bcrypt.compare(password,exUser.password); //패스워드가 동일한지 판별 t/f
+                if (result) {
+                    //정상이라면
+                    done(null, exUser); //Error : null, user : exUser, info : null
+                } else {
+                    //비밀번호 다를경우
+                    done(null, false, {message: '비밀번호가 일치하지 않습니다.'}) //에러 x 유저데이터 x, 메시지 송출
+                }
+            } else {
+                done (null, false, {message: '가입되지 않은 회원입니다.'});
+            }
+        } catch (error) {
+            console.error(error);
+            done(error);
+        }
+    }));
+};
+```
+
+# Kakao SNS 로그인 구현
+SNS 로그인의 특징으로 회원가입 절차가 없다.  
+첫 로그인에 회원가입 처리 그 이후 부터 로그인 처리하는 전략을 사용해야함
+
+```javascript
+const passport = require('passport');
+const KakaoStrategy = require('passport-kakao').Strategy;
+
+const User = require('../models/user');
+
+module.exports = () => {
+    passport.use(new KakaoStrategy({
+        clientID: process.env.KAKAO_ID // 카카오 인증키
+        callbackURL: '/auth/kakao/callback', //카카오로부터 인증 결과를 받을 라우터 주소
+
+        //KakaoStrategy 전략 수행 후 accessToken, refreshToken, profile 생성
+    }, async (accessToken,refreshToken, profile, done)=> {
+        console.log('kakao profile',profile);
+        try {
+            //카카오 계정 조회
+            const exUser = await User.findOne({
+                where: {snsId: profile.id, provider:'kakao'}
+            });
+
+            //존재하는 유저 데이터일경우 바로 실행
+            if (exUser) {
+                done(null,exUser);
+
+                //새로운 유저일 경우, 디비에 생성
+            } else {
+                const newUser = await User.create({
+                    email: profile._json&& profile._json.kakao_account_email, //프로필 기준
+                    nick: profile.displayName,
+                    snsId: profile.id,
+                    provider: 'kakao',
+                });
+                done(null, newUser);
+            }
+        } catch (error) {
+            console.error(error);
+            done(error);
+        }
+    }))
+}
+```
+__routes/auth.js__
+```javascript
+...
+router.get('/kakao',passport.authenticate('kakao'));
+router.get('/kakao/callback',passport.authenticate('kakao',{failureRedirect:'/',}),(req,res)=>{
+    res.redirect('/');
+});
+...
+```
+GET /auth/kakao로 카카오 로그인 과정 시작, 해당 라우터에서 로그인 전략을 수행, 그리고 로그인 성공 여부 결과를 /kakao/callback으로 받음 그리고 리다이렉트  
+로컬 로그인과 다른 점은 passport.authenticate 메서드에 콜백 함수를 제공하지 않음, 내부적으로 req.login을 호출하기 때문에 직접 호출할 필요가 없음
